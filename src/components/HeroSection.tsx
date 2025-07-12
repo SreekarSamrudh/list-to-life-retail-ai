@@ -26,10 +26,12 @@ const HeroSection = () => {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-            <Button variant="hero" size="lg" className="group">
-              <Brain className="h-5 w-5 mr-2 group-hover:rotate-12 transition-transform" />
-              Try AI List Generation
-            </Button>
+            <Link to="/ai-list">
+              <Button variant="hero" size="lg" className="group">
+                <Brain className="h-5 w-5 mr-2 group-hover:rotate-12 transition-transform" />
+                Try AI List Generation
+              </Button>
+            </Link>
             <Link to="/products">
               <Button variant="outline" size="lg">
                 <ShoppingCart className="h-5 w-5 mr-2" />
