@@ -44,13 +44,6 @@ export type Database = {
             referencedRelation: "products"
             referencedColumns: ["product_id"]
           },
-          {
-            foreignKeyName: "carts_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["user_id"]
-          },
         ]
       }
       inventory: {
@@ -146,15 +139,7 @@ export type Database = {
           total_amount?: number | null
           user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "orders_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["user_id"]
-          },
-        ]
+        Relationships: []
       }
       products: {
         Row: {
@@ -192,6 +177,39 @@ export type Database = {
         }
         Relationships: []
       }
+      profiles: {
+        Row: {
+          created_at: string | null
+          email: string | null
+          first_name: string | null
+          id: string
+          last_name: string | null
+          loyalty_points: number | null
+          preferences: Json | null
+          role: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email?: string | null
+          first_name?: string | null
+          id: string
+          last_name?: string | null
+          loyalty_points?: number | null
+          preferences?: Json | null
+          role?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string | null
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          loyalty_points?: number | null
+          preferences?: Json | null
+          role?: string | null
+        }
+        Relationships: []
+      }
       reviews: {
         Row: {
           comment: string | null
@@ -224,13 +242,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["product_id"]
-          },
-          {
-            foreignKeyName: "reviews_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["user_id"]
           },
         ]
       }
@@ -273,33 +284,6 @@ export type Database = {
           },
         ]
       }
-      users: {
-        Row: {
-          created_at: string | null
-          email: string
-          first_name: string | null
-          last_name: string | null
-          password_hash: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          email: string
-          first_name?: string | null
-          last_name?: string | null
-          password_hash: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string | null
-          email?: string
-          first_name?: string | null
-          last_name?: string | null
-          password_hash?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       wishlists: {
         Row: {
           created_at: string | null
@@ -326,13 +310,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["product_id"]
-          },
-          {
-            foreignKeyName: "wishlists_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["user_id"]
           },
         ]
       }

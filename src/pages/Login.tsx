@@ -4,6 +4,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Label } from '../components/ui/label';
+import { supabase } from '../integrations/supabase/client';
 
 const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -15,11 +16,22 @@ const Login = () => {
     e.preventDefault();
     setLoading(true);
     
-    // TODO: Implement Supabase authentication
     try {
-      console.log('Login attempt:', { email, password });
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        console.error('Login error:', error.message);
+        // You can add toast notification here
+        return;
+      }
+
+      if (data.user) {
+        // Redirect to home page
+        window.location.href = '/';
+      }
     } catch (error) {
       console.error('Login error:', error);
     } finally {

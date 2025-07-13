@@ -5,6 +5,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Label } from '../components/ui/label';
+import { supabase } from '../integrations/supabase/client';
 
 const Signup = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -21,11 +22,35 @@ const Signup = () => {
     e.preventDefault();
     setLoading(true);
     
-    // TODO: Implement Supabase authentication
+    if (formData.password !== formData.confirmPassword) {
+      console.error('Passwords do not match');
+      setLoading(false);
+      return;
+    }
+    
     try {
-      console.log('Signup attempt:', formData);
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const { data, error } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          data: {
+            first_name: formData.firstName,
+            last_name: formData.lastName,
+          },
+          emailRedirectTo: `${window.location.origin}/`
+        }
+      });
+
+      if (error) {
+        console.error('Signup error:', error.message);
+        return;
+      }
+
+      if (data.user) {
+        console.log('User created successfully:', data.user);
+        // Redirect to home page
+        window.location.href = '/';
+      }
     } catch (error) {
       console.error('Signup error:', error);
     } finally {

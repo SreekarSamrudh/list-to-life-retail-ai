@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from './ui/button';
 import ProductCard from './ProductCard';
+import { supabase } from '../integrations/supabase/client';
 
 // Mock product data
 const featuredProducts = [
@@ -57,6 +58,83 @@ const featuredProducts = [
 ];
 
 const FeaturedProducts = () => {
+  const [products, setProducts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const { data: productsData, error } = await supabase
+          .from('products')
+          .select('*')
+          .limit(8);
+
+        if (error) {
+          console.error('Error fetching products:', error);
+          setProducts(featuredProducts); // Fallback to mock data
+          return;
+        }
+
+        // Fetch inventory data for stock levels
+        const { data: inventoryData } = await supabase
+          .from('inventory')
+          .select('product_id, current_stock')
+          .in('product_id', productsData?.map(p => p.product_id) || []);
+
+        // Transform data to match expected format
+        const transformedProducts = productsData?.map(product => ({
+          id: product.product_id,
+          name: product.product_name,
+          description: product.description,
+          price: product.price,
+          image: product.image_url,
+          stock: inventoryData?.find(inv => inv.product_id === product.product_id)?.current_stock || 0,
+          category: product.category,
+          aisle: 'Aisle 1', // Default for now
+          rating: 4.5,
+          reviews: 50
+        })) || [];
+
+        setProducts(transformedProducts);
+      } catch (error) {
+        console.error('Error:', error);
+        setProducts(featuredProducts); // Fallback to mock data
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, []);
+
+  if (loading) {
+    return (
+      <section className="py-16 bg-muted/30">
+        <div className="container mx-auto px-4">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h2 className="text-3xl font-bold text-foreground mb-2">
+                Featured Products
+              </h2>
+              <p className="text-muted-foreground">
+                Loading products...
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="bg-card rounded-lg p-4 animate-pulse">
+                <div className="bg-muted h-48 rounded-lg mb-4"></div>
+                <div className="bg-muted h-4 rounded mb-2"></div>
+                <div className="bg-muted h-4 rounded w-1/2"></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="py-16 bg-muted/30">
       <div className="container mx-auto px-4">
@@ -78,7 +156,7 @@ const FeaturedProducts = () => {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {featuredProducts.map((product) => (
+          {products.map((product) => (
             <ProductCard key={product.id} {...product} />
           ))}
         </div>
