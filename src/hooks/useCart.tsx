@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -21,7 +21,7 @@ export const useCart = () => {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const fetchCart = async () => {
+  const fetchCart = useCallback(async () => {
     if (!user) {
       setCartItems([]);
       setLoading(false);
@@ -65,7 +65,7 @@ export const useCart = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, toast]);
 
   const addToCart = async (productId: string, quantity: number = 1) => {
     if (!user) {
@@ -78,7 +78,6 @@ export const useCart = () => {
     }
 
     try {
-      // Check if item already exists in cart
       const { data: existing } = await supabase
         .from('carts')
         .select('*')
@@ -87,7 +86,6 @@ export const useCart = () => {
         .single();
 
       if (existing) {
-        // Update quantity
         const { error } = await supabase
           .from('carts')
           .update({ quantity: existing.quantity + quantity })
@@ -95,7 +93,6 @@ export const useCart = () => {
 
         if (error) throw error;
       } else {
-        // Add new item
         const { error } = await supabase
           .from('carts')
           .insert({
@@ -167,9 +164,27 @@ export const useCart = () => {
     }
   };
 
+  const clearCart = async () => {
+    if (!user) return;
+    try {
+      const { error } = await supabase
+        .from('carts')
+        .delete()
+        .eq('user_id', user.id);
+      if (error) throw error;
+      await fetchCart();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to clear cart: " + error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   useEffect(() => {
     fetchCart();
-  }, [user]);
+  }, [fetchCart]);
 
   const subtotal = cartItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
   const tax = subtotal * 0.08;
@@ -181,6 +196,7 @@ export const useCart = () => {
     addToCart,
     updateQuantity,
     removeFromCart,
+    clearCart,
     subtotal,
     tax,
     total,
