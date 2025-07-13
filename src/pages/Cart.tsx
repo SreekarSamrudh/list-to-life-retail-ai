@@ -4,31 +4,47 @@ import { Link } from 'react-router-dom';
 import Header from '../components/Header';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-
-// Mock cart data
-const cartItems = [
-  {
-    id: '1',
-    name: 'Samsung 55" 4K Smart TV',
-    price: 499.99,
-    quantity: 1,
-    image: 'https://images.unsplash.com/photo-1593305841991-2b567f6b6d7e?w=100&h=100&fit=crop',
-    stock: 15
-  },
-  {
-    id: '2',
-    name: 'Apple AirPods Pro',
-    price: 199.99,
-    quantity: 2,
-    image: 'https://images.unsplash.com/photo-1600294037681-c80e0417681c?w=100&h=100&fit=crop',
-    stock: 30
-  }
-];
+import { useCart } from '@/hooks/useCart';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Cart = () => {
-  const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const tax = subtotal * 0.08; // 8% tax
-  const total = subtotal + tax;
+  const { cartItems, loading, updateQuantity, removeFromCart, subtotal, tax, total } = useCart();
+  const { user } = useAuth();
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container mx-auto px-4 py-8">
+          <div className="text-center py-16">
+            <ShoppingCart className="h-16 w-16 mx-auto mb-4 text-muted-foreground/50" />
+            <h3 className="text-xl font-semibold mb-2">Please sign in</h3>
+            <p className="text-muted-foreground mb-6">
+              Sign in to view your cart and continue shopping
+            </p>
+            <Link to="/login">
+              <Button variant="hero" size="lg">
+                Sign In
+              </Button>
+            </Link>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container mx-auto px-4 py-8">
+          <div className="text-center py-16">
+            <div className="text-muted-foreground">Loading cart...</div>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -49,51 +65,66 @@ const Cart = () => {
           <div className="grid lg:grid-cols-3 gap-8">
             {/* Cart Items */}
             <div className="lg:col-span-2 space-y-4">
-              {cartItems.map((item) => (
-                <Card key={item.id} className="overflow-hidden">
-                  <CardContent className="p-6">
-                    <div className="flex items-center gap-4">
-                      <img
-                        src={item.image}
-                        alt={item.name}
-                        className="w-20 h-20 object-cover rounded-lg"
-                      />
-                      
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-lg mb-1">{item.name}</h3>
-                        <p className="text-muted-foreground text-sm mb-2">
-                          {item.stock} in stock
-                        </p>
-                        <div className="flex items-center gap-4">
-                          <div className="flex items-center border rounded-lg">
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <Minus className="h-4 w-4" />
-                            </Button>
-                            <span className="px-3 py-1 text-sm font-medium">
-                              {item.quantity}
-                            </span>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <Plus className="h-4 w-4" />
+                {cartItems.map((item) => (
+                  <Card key={item.cart_id} className="overflow-hidden">
+                    <CardContent className="p-6">
+                      <div className="flex items-center gap-4">
+                        <img
+                          src={item.product.image_url || 'https://images.unsplash.com/photo-1560472355-536de3962603?w=400&h=400&fit=crop'}
+                          alt={item.product.product_name}
+                          className="w-20 h-20 object-cover rounded-lg"
+                        />
+                        
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-lg mb-1">{item.product.product_name}</h3>
+                          <p className="text-muted-foreground text-sm mb-2">
+                            {item.product.current_stock || 0} in stock
+                          </p>
+                          <div className="flex items-center gap-4">
+                            <div className="flex items-center border rounded-lg">
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8"
+                                onClick={() => updateQuantity(item.cart_id, item.quantity - 1)}
+                              >
+                                <Minus className="h-4 w-4" />
+                              </Button>
+                              <span className="px-3 py-1 text-sm font-medium">
+                                {item.quantity}
+                              </span>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8"
+                                onClick={() => updateQuantity(item.cart_id, item.quantity + 1)}
+                              >
+                                <Plus className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="text-destructive"
+                              onClick={() => removeFromCart(item.cart_id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
-                          <Button variant="ghost" size="icon" className="text-destructive">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
                         </div>
-                      </div>
 
-                      <div className="text-right">
-                        <div className="text-2xl font-bold text-primary">
-                          ${(item.price * item.quantity).toFixed(2)}
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          ${item.price.toFixed(2)} each
+                        <div className="text-right">
+                          <div className="text-2xl font-bold text-primary">
+                            ${(item.product.price * item.quantity).toFixed(2)}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            ${item.product.price.toFixed(2)} each
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                ))}
             </div>
 
             {/* Order Summary */}

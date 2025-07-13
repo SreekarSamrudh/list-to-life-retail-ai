@@ -1,78 +1,157 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Store, Package, TrendingUp, DollarSign, Edit, AlertTriangle } from 'lucide-react';
 import Header from '../components/Header';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { Link } from 'react-router-dom';
 
-// Mock vendor products data
-const mockProducts = [
-  {
-    id: '1',
-    name: 'Samsung 55" 4K Smart TV',
-    price: 499.99,
-    stock: 15,
-    category: 'Electronics',
-    aisle: 'Aisle 10',
-    sales: 24,
-    revenue: 11999.76
-  },
-  {
-    id: '2',
-    name: 'Apple AirPods Pro',
-    price: 199.99,
-    stock: 8,
-    category: 'Electronics',
-    aisle: 'Aisle 10',
-    sales: 45,
-    revenue: 8999.55
-  },
-  {
-    id: '3',
-    name: 'HP Pavilion Laptop',
-    price: 799.99,
-    stock: 3,
-    category: 'Electronics',
-    aisle: 'Aisle 10',
-    sales: 12,
-    revenue: 9599.88
-  },
-  {
-    id: '4',
-    name: 'Men\'s Denim Jacket',
-    price: 39.99,
-    stock: 25,
-    category: 'Clothing',
-    aisle: 'Aisle 5',
-    sales: 18,
-    revenue: 719.82
-  }
-];
+interface InventoryItem {
+  product_id: string;
+  current_stock: number;
+  product: {
+    product_name: string;
+    price: number;
+    category: string;
+    subcategory: string;
+  };
+}
 
 const Vendor = () => {
-  const [products, setProducts] = useState(mockProducts);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [newStock, setNewStock] = useState<string>('');
+  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+  const { toast } = useToast();
 
-  const handleStockUpdate = (productId: string, stock: number) => {
-    setProducts(prev => 
-      prev.map(product => 
-        product.id === productId 
-          ? { ...product, stock }
-          : product
-      )
-    );
-    setEditingId(null);
-    setNewStock('');
-    
-    // TODO: Update stock in database and trigger stock_engine.py
-    console.log(`Updated stock for product ${productId} to ${stock}`);
+  const fetchInventory = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('inventory')
+        .select(`
+          product_id,
+          current_stock,
+          products(
+            product_name,
+            price,
+            category,
+            subcategory
+          )
+        `)
+        .eq('store_id', 'store-1'); // Default store
+
+      if (error) throw error;
+      
+      const formattedData = (data || []).map(item => ({
+        product_id: item.product_id,
+        current_stock: item.current_stock,
+        product: item.products
+      }));
+      
+      setInventory(formattedData);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to fetch inventory: " + error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const totalRevenue = products.reduce((sum, product) => sum + product.revenue, 0);
-  const totalSales = products.reduce((sum, product) => sum + product.sales, 0);
-  const lowStockCount = products.filter(product => product.stock < 10).length;
+  const handleStockUpdate = async (productId: string, stock: number) => {
+    try {
+      const { error } = await supabase
+        .from('inventory')
+        .update({ 
+          current_stock: stock,
+          last_updated: new Date().toISOString()
+        })
+        .eq('product_id', productId)
+        .eq('store_id', 'store-1');
+
+      if (error) throw error;
+
+      setInventory(prev => 
+        prev.map(item => 
+          item.product_id === productId 
+            ? { ...item, current_stock: stock }
+            : item
+        )
+      );
+      
+      setEditingId(null);
+      setNewStock('');
+      
+      toast({
+        title: "Stock updated",
+        description: "Inventory has been updated successfully",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to update stock: " + error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  useEffect(() => {
+    fetchInventory();
+
+    // Set up real-time subscription for inventory updates
+    const channel = supabase
+      .channel('inventory-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'inventory'
+        },
+        () => {
+          fetchInventory();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container mx-auto px-4 py-8">
+          <div className="text-center py-16">
+            <Store className="h-16 w-16 mx-auto mb-4 text-muted-foreground/50" />
+            <h3 className="text-xl font-semibold mb-2">Please sign in</h3>
+            <p className="text-muted-foreground mb-6">
+              Sign in to access the vendor dashboard
+            </p>
+            <Link to="/login">
+              <Button variant="hero" size="lg">
+                Sign In
+              </Button>
+            </Link>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  const totalRevenue = inventory.reduce((sum, item) => sum + (item.product.price * item.current_stock), 0);
+  const totalProducts = inventory.length;
+  const lowStockCount = inventory.filter(item => item.current_stock < 10).length;
 
   return (
     <div className="min-h-screen bg-background">
@@ -112,8 +191,8 @@ const Vendor = () => {
                   <TrendingUp className="h-6 w-6 text-success" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Total Sales</p>
-                  <p className="text-2xl font-bold text-success">{totalSales}</p>
+                  <p className="text-sm text-muted-foreground">Total Products</p>
+                  <p className="text-2xl font-bold text-success">{totalProducts}</p>
                 </div>
               </div>
             </CardContent>
@@ -126,8 +205,8 @@ const Vendor = () => {
                   <Package className="h-6 w-6 text-secondary" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Total Products</p>
-                  <p className="text-2xl font-bold text-secondary">{products.length}</p>
+                  <p className="text-sm text-muted-foreground">Total Value</p>
+                  <p className="text-2xl font-bold text-secondary">${totalRevenue.toFixed(2)}</p>
                 </div>
               </div>
             </CardContent>
@@ -169,89 +248,103 @@ const Vendor = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {products.map((product) => (
-                    <tr key={product.id} className="border-b hover:bg-muted/30 transition-colors">
-                      <td className="py-4 px-2">
-                        <div>
-                          <p className="font-medium">{product.name}</p>
-                        </div>
-                      </td>
-                      <td className="py-4 px-2">
-                        <span className="font-semibold">${product.price}</span>
-                      </td>
-                      <td className="py-4 px-2">
-                        <div className="flex items-center gap-2">
-                          {editingId === product.id ? (
-                            <div className="flex items-center gap-2">
-                              <Input
-                                type="number"
-                                value={newStock}
-                                onChange={(e) => setNewStock(e.target.value)}
-                                className="w-20"
-                                placeholder={product.stock.toString()}
-                              />
-                              <Button
-                                size="sm"
-                                onClick={() => handleStockUpdate(product.id, parseInt(newStock) || product.stock)}
-                              >
-                                Save
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  setEditingId(null);
-                                  setNewStock('');
-                                }}
-                              >
-                                Cancel
-                              </Button>
-                            </div>
-                          ) : (
-                            <>
-                              <span className={product.stock < 10 ? 'text-warning font-bold' : ''}>
-                                {product.stock}
-                              </span>
-                              {product.stock < 10 && (
-                                <Badge variant="secondary" className="bg-warning text-warning-foreground">
-                                  Low
-                                </Badge>
-                              )}
-                            </>
-                          )}
-                        </div>
-                      </td>
-                      <td className="py-4 px-2">
-                        <Badge variant="outline">{product.category}</Badge>
-                      </td>
-                      <td className="py-4 px-2 text-muted-foreground">
-                        {product.aisle}
-                      </td>
-                      <td className="py-4 px-2">
-                        <span className="font-medium">{product.sales}</span>
-                      </td>
-                      <td className="py-4 px-2">
-                        <span className="font-semibold text-success">
-                          ${product.revenue.toLocaleString()}
-                        </span>
-                      </td>
-                      <td className="py-4 px-2">
-                        {editingId !== product.id && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setEditingId(product.id);
-                              setNewStock(product.stock.toString());
-                            }}
-                          >
-                            <Edit className="h-4 w-4 mr-1" />
-                            Edit Stock
-                          </Button>
-                        )}
+                  {loading ? (
+                    <tr>
+                      <td colSpan={8} className="py-8 text-center text-muted-foreground">
+                        Loading inventory...
                       </td>
                     </tr>
-                  ))}
+                  ) : inventory.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="py-8 text-center text-muted-foreground">
+                        No inventory items found
+                      </td>
+                    </tr>
+                  ) : (
+                    inventory.map((item) => (
+                      <tr key={item.product_id} className="border-b hover:bg-muted/30 transition-colors">
+                        <td className="py-4 px-2">
+                          <div>
+                            <p className="font-medium">{item.product.product_name}</p>
+                          </div>
+                        </td>
+                        <td className="py-4 px-2">
+                          <span className="font-semibold">${item.product.price}</span>
+                        </td>
+                        <td className="py-4 px-2">
+                          <div className="flex items-center gap-2">
+                            {editingId === item.product_id ? (
+                              <div className="flex items-center gap-2">
+                                <Input
+                                  type="number"
+                                  value={newStock}
+                                  onChange={(e) => setNewStock(e.target.value)}
+                                  className="w-20"
+                                  placeholder={item.current_stock.toString()}
+                                />
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleStockUpdate(item.product_id, parseInt(newStock) || item.current_stock)}
+                                >
+                                  Save
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setEditingId(null);
+                                    setNewStock('');
+                                  }}
+                                >
+                                  Cancel
+                                </Button>
+                              </div>
+                            ) : (
+                              <>
+                                <span className={item.current_stock < 10 ? 'text-warning font-bold' : ''}>
+                                  {item.current_stock}
+                                </span>
+                                {item.current_stock < 10 && (
+                                  <Badge variant="secondary" className="bg-warning text-warning-foreground">
+                                    Low
+                                  </Badge>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-4 px-2">
+                          <Badge variant="outline">{item.product.category}</Badge>
+                        </td>
+                        <td className="py-4 px-2 text-muted-foreground">
+                          {item.product.subcategory}
+                        </td>
+                        <td className="py-4 px-2">
+                          <span className="font-medium">0</span>
+                        </td>
+                        <td className="py-4 px-2">
+                          <span className="font-semibold text-success">
+                            $0
+                          </span>
+                        </td>
+                        <td className="py-4 px-2">
+                          {editingId !== item.product_id && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setEditingId(item.product_id);
+                                setNewStock(item.current_stock.toString());
+                              }}
+                            >
+                              <Edit className="h-4 w-4 mr-1" />
+                              Edit Stock
+                            </Button>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>

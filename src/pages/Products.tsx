@@ -5,94 +5,20 @@ import ProductCard from '../components/ProductCard';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-
-// Mock product data
-const allProducts = [
-  {
-    id: '1',
-    name: 'Samsung 55" 4K Smart TV',
-    description: 'Crystal UHD display with HDR technology',
-    price: 499.99,
-    image: 'https://images.unsplash.com/photo-1593305841991-2b567f6b6d7e?w=400&h=400&fit=crop',
-    stock: 15,
-    category: 'Electronics',
-    aisle: 'Aisle 10',
-    rating: 4.5,
-    reviews: 128
-  },
-  {
-    id: '2',
-    name: 'Apple AirPods Pro',
-    description: 'Wireless earbuds with noise cancellation',
-    price: 199.99,
-    image: 'https://images.unsplash.com/photo-1600294037681-c80e0417681c?w=400&h=400&fit=crop',
-    stock: 30,
-    category: 'Electronics',
-    aisle: 'Aisle 10',
-    rating: 4.8,
-    reviews: 256
-  },
-  {
-    id: '3',
-    name: 'Men\'s Denim Jacket',
-    description: 'Classic blue denim jacket',
-    price: 39.99,
-    image: 'https://images.unsplash.com/photo-1601333118714-7f7380b28f10?w=400&h=400&fit=crop',
-    stock: 8,
-    category: 'Clothing',
-    aisle: 'Aisle 5',
-    rating: 4.2,
-    reviews: 64
-  },
-  {
-    id: '4',
-    name: 'HP Pavilion Laptop',
-    description: '16GB RAM, 512GB SSD, Intel i5',
-    price: 799.99,
-    image: 'https://images.unsplash.com/photo-1587613750950-9e5b7c8ae0e9?w=400&h=400&fit=crop',
-    stock: 12,
-    category: 'Electronics',
-    aisle: 'Aisle 10',
-    rating: 4.3,
-    reviews: 89
-  },
-  {
-    id: '5',
-    name: 'Women\'s Athletic Leggings',
-    description: 'High-waisted, stretchable fabric',
-    price: 24.99,
-    image: 'https://images.unsplash.com/photo-1575052814086-f9e4d0eb1370?w=400&h=400&fit=crop',
-    stock: 75,
-    category: 'Clothing',
-    aisle: 'Aisle 5',
-    rating: 4.6,
-    reviews: 142
-  },
-  {
-    id: '6',
-    name: 'Organic Whole Milk',
-    description: '1-gallon jug of fresh organic milk',
-    price: 4.99,
-    image: 'https://images.unsplash.com/photo-1563636619-e9143da7973b?w=400&h=400&fit=crop',
-    stock: 200,
-    category: 'Groceries',
-    aisle: 'Aisle 8',
-    rating: 4.6,
-    reviews: 89
-  }
-];
+import { useProducts } from '@/hooks/useProducts';
 
 const Products = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [sortBy, setSortBy] = useState('name');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  
+  const { products, loading } = useProducts();
+  const categories = ['all', ...Array.from(new Set(products.map(p => p.category)))];
 
-  const categories = ['all', 'Electronics', 'Clothing', 'Groceries', 'Home'];
-
-  const filteredProducts = allProducts
+  const filteredProducts = products
     .filter(product => 
-      product.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
+      product.product_name.toLowerCase().includes(searchTerm.toLowerCase()) &&
       (selectedCategory === 'all' || product.category === selectedCategory)
     )
     .sort((a, b) => {
@@ -101,10 +27,8 @@ const Products = () => {
           return a.price - b.price;
         case 'price-high':
           return b.price - a.price;
-        case 'rating':
-          return (b.rating || 0) - (a.rating || 0);
         default:
-          return a.name.localeCompare(b.name);
+          return a.product_name.localeCompare(b.product_name);
       }
     });
 
@@ -187,15 +111,17 @@ const Products = () => {
         </div>
 
         {/* Products Grid */}
-        {filteredProducts.length > 0 ? (
+        {loading ? (
+          <div className="text-center py-16">Loading products...</div>
+        ) : filteredProducts.length > 0 ? (
           <div className={`grid gap-6 ${
             viewMode === 'grid' 
               ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' 
               : 'grid-cols-1'
           }`}>
-            {filteredProducts.map((product) => (
-              <ProductCard key={product.id} {...product} />
-            ))}
+             {filteredProducts.map((product) => (
+               <ProductCard key={product.product_id} product={product} />
+             ))}
           </div>
         ) : (
           <div className="text-center py-16">
