@@ -163,7 +163,7 @@ export const useCart = () => {
       });
     }
   };
-
+  
   const clearCart = async () => {
     if (!user) return;
     try {
@@ -181,6 +181,7 @@ export const useCart = () => {
       });
     }
   };
+
 
   useEffect(() => {
     fetchCart();
