@@ -1,14 +1,68 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Header from '../components/Header';
 import { useCart } from '@/hooks/useCart';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 const Checkout = () => {
-  const { cartItems, subtotal, tax, total } = useCart();
+  const { cartItems, subtotal, tax, total, clearCart } = useCart();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const handlePlaceOrder = async () => {
+    if (!user) {
+      toast({ title: "Please sign in to place an order.", variant: "destructive" });
+      return;
+    }
+
+    const order_id = `ORD-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
+
+    try {
+      // 1. Create the order
+      const { error: orderError } = await supabase.from('orders').insert({
+        order_id,
+        user_id: user.id,
+        total_amount: total,
+        status: 'processing',
+      });
+
+      if (orderError) throw orderError;
+
+      // 2. Create order items
+      const orderItems = cartItems.map(item => ({
+        order_item_id: crypto.randomUUID(),
+        order_id,
+        product_id: item.product_id,
+        quantity: item.quantity,
+        price: item.product.price,
+      }));
+
+      const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
+
+      if (itemsError) throw itemsError;
+
+      // 3. Clear the cart
+      await clearCart();
+
+      // 4. Show success and redirect
+      toast({ title: "Order Placed!", description: "Your order has been successfully placed." });
+      navigate('/orders');
+
+    } catch (error: any) {
+      toast({
+        title: "Order Failed",
+        description: "There was an issue placing your order. " + error.message,
+        variant: "destructive",
+      });
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -106,7 +160,7 @@ const Checkout = () => {
                       </div>
                     </div>
                   </div>
-                  <Button variant="hero" size="lg" className="w-full">
+                  <Button variant="hero" size="lg" className="w-full" onClick={handlePlaceOrder}>
                     Place Order
                   </Button>
                 </CardContent>
